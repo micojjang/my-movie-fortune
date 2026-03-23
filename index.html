@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>나의 오늘 영화</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700;900&family=DM+Serif+Display:ital@0;1&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0806;
+      --paper: #12100e;
+      --gold: #c9a84c;
+      --gold-light: #e8c97a;
+      --cream: #f0e8d8;
+      --muted: #6b6258;
+      --red: #8b1a1a;
+      --text: #e8ddd0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Noto Sans KR', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Film grain overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+      pointer-events: none;
+      z-index: 9999;
+      opacity: 0.4;
+    }
+
+    /* Film strip top */
+    .filmstrip {
+      width: 100%;
+      height: 28px;
+      background: #1a1410;
+      display: flex;
+      align-items: center;
+      gap: 0;
+      overflow: hidden;
+      border-bottom: 1px solid #2a2018;
+    }
+    .filmstrip-hole {
+      width: 18px;
+      height: 14px;
+      background: var(--bg);
+      border-radius: 2px;
+      margin: 0 8px;
+      flex-shrink: 0;
+    }
+
+    .container {
+      max-width: 680px;
+      margin: 0 auto;
+      padding: 48px 24px 80px;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      margin-bottom: 56px;
+    }
+    .header-eyebrow {
+      font-family: 'DM Serif Display', serif;
+      font-size: 11px;
+      letter-spacing: 0.3em;
+      color: var(--gold);
+      text-transform: uppercase;
+      margin-bottom: 16px;
+      opacity: 0.8;
+    }
+    .header h1 {
+      font-family: 'Noto Serif KR', serif;
+      font-size: clamp(2.2rem, 6vw, 3.2rem);
+      font-weight: 900;
+      line-height: 1.1;
+      color: var(--cream);
+      margin-bottom: 12px;
+    }
+    .header h1 em {
+      font-style: italic;
+      color: var(--gold-light);
+      display: block;
+    }
+    .header p {
+      font-size: 0.85rem;
+      color: var(--muted);
+      line-height: 1.7;
+      font-weight: 300;
+    }
+
+    /* Divider */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin: 40px 0;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: linear-gradient(to right, transparent, var(--gold), transparent);
+      opacity: 0.4;
+    }
+    .divider-icon {
+      color: var(--gold);
+      font-size: 14px;
+      opacity: 0.6;
+    }
+
+    /* Form */
+    .form-card {
+      background: var(--paper);
+      border: 1px solid #2a2018;
+      border-radius: 4px;
+      padding: 36px;
+      position: relative;
+    }
+    .form-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(to right, var(--red), var(--gold), var(--red));
+      border-radius: 4px 4px 0 0;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .form-group.full { grid-column: 1 / -1; }
+
+    label {
+      font-size: 0.72rem;
+      font-weight: 500;
+      letter-spacing: 0.15em;
+      color: var(--gold);
+      text-transform: uppercase;
+    }
+
+    input, select {
+      background: #0a0806;
+      border: 1px solid #2a2018;
+      border-radius: 3px;
+      color: var(--text);
+      font-family: 'Noto Sans KR', sans-serif;
+      font-size: 0.9rem;
+      padding: 12px 14px;
+      width: 100%;
+      transition: border-color 0.2s;
+      -webkit-appearance: none;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--gold);
+    }
+    input::placeholder { color: var(--muted); }
+    select option { background: #1a1410; }
+
+    /* Mood selector */
+    .mood-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .mood-btn {
+      background: #0a0806;
+      border: 1px solid #2a2018;
+      border-radius: 3px;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: 'Noto Sans KR', sans-serif;
+      font-size: 0.78rem;
+      padding: 10px 4px;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .mood-btn:hover { border-color: var(--gold); color: var(--text); }
+    .mood-btn.active {
+      background: #1a1208;
+      border-color: var(--gold);
+      color: var(--gold-light);
+    }
+    .mood-emoji { display: block; font-size: 1.4rem; margin-bottom: 4px; }
+
+    /* API Key */
+    .api-section {
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid #1a1410;
+    }
+    .api-note {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+    .api-note a { color: var(--gold); text-decoration: none; }
+
+    /* Submit */
+    .submit-btn {
+      width: 100%;
+      margin-top: 28px;
+      background: linear-gradient(135deg, #8b1a1a 0%, #c9a84c 50%, #8b1a1a 100%);
+      background-size: 200% 100%;
+      border: none;
+      border-radius: 3px;
+      color: var(--cream);
+      cursor: pointer;
+      font-family: 'Noto Serif KR', serif;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      padding: 16px;
+      transition: background-position 0.4s, transform 0.1s;
+    }
+    .submit-btn:hover { background-position: 100% 0; }
+    .submit-btn:active { transform: scale(0.99); }
+    .submit-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* Loading */
+    .loading {
+      text-align: center;
+      padding: 48px 0;
+      display: none;
+    }
+    .loading.show { display: block; }
+    .clapperboard {
+      font-size: 3rem;
+      animation: clap 0.8s ease-in-out infinite alternate;
+      display: block;
+      margin-bottom: 16px;
+    }
+    @keyframes clap {
+      from { transform: rotate(-10deg); }
+      to { transform: rotate(10deg); }
+    }
+    .loading-text {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1rem;
+      color: var(--gold);
+      letter-spacing: 0.2em;
+    }
+    .loading-sub {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 8px;
+    }
+
+    /* Result - Movie Poster Style */
+    .result {
+      display: none;
+      animation: fadeUp 0.6s ease forwards;
+    }
+    .result.show { display: block; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .poster {
+      background: var(--paper);
+      border: 1px solid #2a2018;
+      border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .poster-top-bar {
+      background: var(--red);
+      padding: 8px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .poster-rating {
+      font-family: 'DM Serif Display', serif;
+      font-size: 0.7rem;
+      letter-spacing: 0.2em;
+      color: var(--cream);
+      opacity: 0.8;
+    }
+
+    .poster-body {
+      padding: 40px 36px;
+      position: relative;
+    }
+
+    /* Atmospheric background */
+    .poster-body::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: radial-gradient(ellipse at 50% 0%, #1a1208 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .genre-badge {
+      display: inline-block;
+      border: 1px solid var(--gold);
+      border-radius: 2px;
+      color: var(--gold);
+      font-size: 0.68rem;
+      letter-spacing: 0.25em;
+      padding: 4px 12px;
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+
+    .movie-title {
+      font-family: 'Noto Serif KR', serif;
+      font-size: clamp(1.8rem, 5vw, 2.6rem);
+      font-weight: 900;
+      line-height: 1.15;
+      color: var(--cream);
+      margin-bottom: 24px;
+      position: relative;
+    }
+
+    .poster-copy {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1.05rem;
+      font-style: italic;
+      color: var(--gold-light);
+      line-height: 1.5;
+      margin-bottom: 32px;
+      padding-left: 16px;
+      border-left: 2px solid var(--gold);
+      opacity: 0.9;
+    }
+
+    .narration-section {
+      background: #0a0806;
+      border: 1px solid #1a1410;
+      border-radius: 3px;
+      padding: 20px 24px;
+      position: relative;
+    }
+    .narration-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.3em;
+      color: var(--muted);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    .narration-text {
+      font-family: 'DM Serif Display', serif;
+      font-size: 1rem;
+      line-height: 1.7;
+      color: var(--cream);
+    }
+
+    .poster-bottom {
+      padding: 20px 36px;
+      border-top: 1px solid #1a1410;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .poster-date {
+      font-size: 0.72rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+    }
+    .poster-logo {
+      font-family: 'DM Serif Display', serif;
+      font-size: 0.8rem;
+      color: var(--gold);
+      opacity: 0.6;
+      letter-spacing: 0.15em;
+    }
+
+    /* Again button */
+    .again-btn {
+      width: 100%;
+      margin-top: 20px;
+      background: transparent;
+      border: 1px solid #2a2018;
+      border-radius: 3px;
+      color: var(--muted);
+      cursor: pointer;
+      font-family: 'Noto Sans KR', sans-serif;
+      font-size: 0.85rem;
+      padding: 12px;
+      transition: all 0.2s;
+    }
+    .again-btn:hover { border-color: var(--gold); color: var(--gold); }
+
+    /* Error */
+    .error-msg {
+      background: #1a0a0a;
+      border: 1px solid var(--red);
+      border-radius: 3px;
+      color: #e88;
+      font-size: 0.85rem;
+      padding: 14px 18px;
+      margin-top: 16px;
+      display: none;
+    }
+    .error-msg.show { display: block; }
+
+    @media (max-width: 480px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .mood-grid { grid-template-columns: repeat(4, 1fr); }
+      .form-card { padding: 24px 20px; }
+      .poster-body { padding: 28px 24px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="filmstrip" id="filmstrip"></div>
+
+  <div class="container">
+    <div class="header">
+      <div class="header-eyebrow">✦ AI 사주 운세 ✦</div>
+      <h1>나의 오늘<em>영화</em></h1>
+      <p>오늘 하루, 당신은 어떤 영화의 주인공인가요?<br>생년월일과 기분을 입력하면 오늘의 운세를 영화 한 편으로 만들어드립니다.</p>
+    </div>
+
+    <!-- Form -->
+    <div class="form-card" id="formSection">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>생년월일</label>
+          <input type="date" id="birthdate" />
+        </div>
+        <div class="form-group">
+          <label>태어난 시간</label>
+          <input type="time" id="birthtime" placeholder="예: 09:30" />
+        </div>
+        <div class="form-group">
+          <label>MBTI</label>
+          <select id="mbti">
+            <option value="">선택하세요</option>
+            <option>INTJ</option><option>INTP</option><option>ENTJ</option><option>ENTP</option>
+            <option>INFJ</option><option>INFP</option><option>ENFJ</option><option>ENFP</option>
+            <option>ISTJ</option><option>ISFJ</option><option>ESTJ</option><option>ESFJ</option>
+            <option>ISTP</option><option>ISFP</option><option>ESTP</option><option>ESFP</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>성별</label>
+          <select id="gender">
+            <option value="">선택하세요</option>
+            <option value="남성">남성</option>
+            <option value="여성">여성</option>
+            <option value="기타">기타</option>
+          </select>
+        </div>
+        <div class="form-group full">
+          <label>오늘의 기분</label>
+          <div class="mood-grid">
+            <button class="mood-btn" data-mood="설렘">
+              <span class="mood-emoji">💫</span>설렘
+            </button>
+            <button class="mood-btn" data-mood="불안">
+              <span class="mood-emoji">🌀</span>불안
+            </button>
+            <button class="mood-btn" data-mood="무기력">
+              <span class="mood-emoji">🌧️</span>무기력
+            </button>
+            <button class="mood-btn" data-mood="의욕">
+              <span class="mood-emoji">🔥</span>의욕
+            </button>
+            <button class="mood-btn" data-mood="평온">
+              <span class="mood-emoji">🌿</span>평온
+            </button>
+            <button class="mood-btn" data-mood="외로움">
+              <span class="mood-emoji">🌙</span>외로움
+            </button>
+            <button class="mood-btn" data-mood="흥분">
+              <span class="mood-emoji">⚡</span>흥분
+            </button>
+            <button class="mood-btn" data-mood="혼란">
+              <span class="mood-emoji">🎭</span>혼란
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="api-section">
+        <div class="form-group">
+          <label>OpenRouter API Key</label>
+          <input type="password" id="apiKey" placeholder="sk-or-v1-..." />
+          <div class="api-note">
+            키는 브라우저에만 저장되며 서버로 전송되지 않습니다.
+            <a href="https://openrouter.ai/keys" target="_blank">API 키 발급 →</a>
+          </div>
+        </div>
+      </div>
+
+      <button class="submit-btn" id="submitBtn" onclick="generateMovie()">
+        🎬 오늘의 영화 만들기
+      </button>
+      <div class="error-msg" id="errorMsg"></div>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading" id="loading">
+      <span class="clapperboard">🎬</span>
+      <div class="loading-text">촬영 중...</div>
+      <div class="loading-sub">당신의 오늘을 영화로 엮고 있습니다</div>
+    </div>
+
+    <!-- Result -->
+    <div class="result" id="result">
+      <div class="poster">
+        <div class="poster-top-bar">
+          <span class="poster-rating">오늘의 상영작</span>
+          <span class="poster-rating" id="resultDate"></span>
+        </div>
+        <div class="poster-body">
+          <div class="genre-badge" id="resultGenre"></div>
+          <div class="movie-title" id="resultTitle"></div>
+          <div class="poster-copy" id="resultCopy"></div>
+          <div class="narration-section">
+            <div class="narration-label">🎙 예고편 나레이션</div>
+            <div class="narration-text" id="resultNarration"></div>
+          </div>
+        </div>
+        <div class="poster-bottom">
+          <span class="poster-date" id="resultDateBottom"></span>
+          <span class="poster-logo">나의 오늘 영화</span>
+        </div>
+      </div>
+      <button class="again-btn" onclick="resetForm()">↺ 다시 만들기</button>
+    </div>
+  </div>
+
+  <script>
+    // Film strip holes
+    const strip = document.getElementById('filmstrip');
+    for (let i = 0; i < 60; i++) {
+      const hole = document.createElement('div');
+      hole.className = 'filmstrip-hole';
+      strip.appendChild(hole);
+    }
+
+    // Mood selection
+    let selectedMood = '';
+    document.querySelectorAll('.mood-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        selectedMood = btn.dataset.mood;
+      });
+    });
+
+    async function generateMovie() {
+      const birthdate = document.getElementById('birthdate').value;
+      const birthtime = document.getElementById('birthtime').value;
+      const mbti = document.getElementById('mbti').value;
+      const gender = document.getElementById('gender').value;
+      const apiKey = document.getElementById('apiKey').value.trim();
+
+      // Validation
+      const errorMsg = document.getElementById('errorMsg');
+      errorMsg.classList.remove('show');
+
+      if (!birthdate) return showError('생년월일을 입력해주세요.');
+      if (!mbti) return showError('MBTI를 선택해주세요.');
+      if (!selectedMood) return showError('오늘의 기분을 선택해주세요.');
+      if (!apiKey) return showError('OpenRouter API 키를 입력해주세요.');
+
+      // Show loading
+      document.getElementById('formSection').style.display = 'none';
+      document.getElementById('loading').classList.add('show');
+
+      const today = new Date();
+      const todayStr = today.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
+
+      const prompt = `당신은 사주와 영화를 결합한 창의적인 운세 작가입니다.
+
+사용자 정보:
+- 생년월일: ${birthdate}
+- 태어난 시간: ${birthtime || '모름'}
+- 성별: ${gender || '미입력'}
+- MBTI: ${mbti}
+- 오늘의 기분: ${selectedMood}
+- 오늘 날짜: ${todayStr}
+
+위 사주 정보(생년월일, 시간)를 바탕으로 오늘의 운세를 해석하고, MBTI 성격 유형과 현재 기분을 반영하여 오늘 하루를 영화 한 편으로 표현해주세요.
+
+반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 절대 포함하지 마세요:
+
+{
+  "genre": "오늘의 장르 (로맨스/스릴러/성장드라마/코미디/느와르/SF/판타지 중 하나)",
+  "title": "오늘의 나를 표현하는 감각적인 한국어 영화 제목 (《》 기호 없이)",
+  "poster_copy": "영화 포스터에 들어갈 한 줄 카피. 감성적이고 시적으로.",
+  "trailer_narration": "예고편 나레이션 스타일의 짧고 드라마틱한 텍스트. 2-3문장. '그는', '그녀는', '그들은' 같은 3인칭 또는 2인칭으로."
+}`;
+
+      try {
+        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': window.location.href,
+            'X-Title': '나의 오늘 영화',
+          },
+          body: JSON.stringify({
+            model: 'google/gemini-flash-1.5',
+            messages: [{ role: 'user', content: prompt }],
+            response_format: { type: 'json_object' },
+            max_tokens: 600,
+            temperature: 0.9,
+          })
+        });
+
+        if (!response.ok) {
+          const err = await response.json();
+          throw new Error(err.error?.message || `API 오류 (${response.status})`);
+        }
+
+        const data = await response.json();
+        const content = data.choices[0].message.content;
+
+        let result;
+        try {
+          result = JSON.parse(content);
+        } catch {
+          // Try extracting JSON from text
+          const match = content.match(/\{[\s\S]*\}/);
+          if (match) result = JSON.parse(match[0]);
+          else throw new Error('응답 파싱 실패');
+        }
+
+        showResult(result, todayStr);
+
+      } catch (err) {
+        document.getElementById('loading').classList.remove('show');
+        document.getElementById('formSection').style.display = 'block';
+        showError(err.message || 'API 호출 중 오류가 발생했습니다.');
+      }
+    }
+
+    function showResult(data, dateStr) {
+      document.getElementById('loading').classList.remove('show');
+
+      document.getElementById('resultGenre').textContent = data.genre || '드라마';
+      document.getElementById('resultTitle').textContent = `《${data.title}》`;
+      document.getElementById('resultCopy').textContent = data.poster_copy || '';
+      document.getElementById('resultNarration').textContent = data.trailer_narration || '';
+      document.getElementById('resultDate').textContent = dateStr;
+      document.getElementById('resultDateBottom').textContent = dateStr + ' 단 하루만 상영';
+
+      document.getElementById('result').classList.add('show');
+    }
+
+    function showError(msg) {
+      const el = document.getElementById('errorMsg');
+      el.textContent = '⚠ ' + msg;
+      el.classList.add('show');
+    }
+
+    function resetForm() {
+      document.getElementById('result').classList.remove('show');
+      document.getElementById('formSection').style.display = 'block';
+      document.getElementById('errorMsg').classList.remove('show');
+      document.querySelectorAll('.mood-btn').forEach(b => b.classList.remove('active'));
+      selectedMood = '';
+    }
+  </script>
+</body>
+</html>
