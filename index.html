@@ -656,7 +656,8 @@
       } catch (err) {
         document.getElementById('loading').classList.remove('show');
         document.getElementById('formSection').style.display = 'block';
-        showError(err.message || 'API 호출 중 오류가 발생했습니다.');
+        console.error('Full error:', err);
+        showError((err.message || 'API 호출 중 오류가 발생했습니다.') + ' [' + err.name + ']');
       }
     }
 
