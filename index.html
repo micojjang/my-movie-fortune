@@ -448,7 +448,7 @@
         </div>
         <div class="form-group">
           <label>태어난 시간</label>
-          <input type="time" id="birthtime" placeholder="예: 09:30" />
+          <input type="text" id="birthtime" placeholder="예: 09:30 또는 23:00 (모르면 비워두세요)" />
         </div>
         <div class="form-group">
           <label>MBTI</label>
@@ -622,21 +622,24 @@
             'X-Title': '나의 오늘 영화',
           },
           body: JSON.stringify({
-            model: 'google/gemini-flash-1.5',
+            model: 'google/gemini-2.0-flash-001',
             messages: [{ role: 'user', content: prompt }],
-            response_format: { type: 'json_object' },
             max_tokens: 600,
             temperature: 0.9,
           })
         });
 
         if (!response.ok) {
-          const err = await response.json();
-          throw new Error(err.error?.message || `API 오류 (${response.status})`);
+          let errMsg = `API 오류 (${response.status})`;
+          try { const err = await response.json(); errMsg = err.error?.message || errMsg; } catch {}
+          throw new Error(errMsg);
+          //
+          
         }
 
         const data = await response.json();
-        const content = data.choices[0].message.content;
+        const content = data?.choices?.[0]?.message?.content;
+        if (!content) throw new Error('응답이 비어있습니다. API 키를 확인해주세요.');
 
         let result;
         try {
